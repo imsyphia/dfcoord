@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -16,6 +17,18 @@ type twoParams struct {
 // the file writing is a hack for now
 
 func main() {
+
+	var err error
+
+	if len(os.Args) < 2 || len(os.Args) > 2 {
+		log.Fatal("Usage: dfcoord <dimension seed>")
+	}
+
+	dimSeed, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	reduce := func(a twoParams, first bool, d dfParams) (twoParams, bool) {
 		if d.axis == axisX {
 			if !a.okx {
@@ -32,9 +45,7 @@ func main() {
 		return a, cont
 	}
 
-	t := genFromDimSeed(0, reduce)
-
-	var err error
+	t := genFromDimSeed(int64(dimSeed), reduce)
 
 	err = os.MkdirAll(fmt.Sprintf("%s/worldgen/density_function", namespace), fs.ModeDir)
 	if err != nil {
@@ -65,6 +76,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	return
+
 }
 
 func writeDfFile(ns string, name string, p dfParams) error {
