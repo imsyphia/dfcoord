@@ -47,12 +47,12 @@ func main() {
 
 	t := genFromDimSeed(int64(dimSeed), reduce)
 
-	err = os.MkdirAll(fmt.Sprintf("%s/worldgen/density_function", namespace), fs.ModeDir)
+	err = os.MkdirAll(fmt.Sprintf("%s/worldgen/density_function", namespace), fs.ModeDir+fs.ModePerm)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = os.MkdirAll(fmt.Sprintf("%s/worldgen/noise", namespace), fs.ModeDir)
+	err = os.MkdirAll(fmt.Sprintf("%s/worldgen/noise", namespace), fs.ModeDir+fs.ModePerm)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,11 +83,11 @@ func main() {
 
 func writeDfFile(ns string, name string, p dfParams) error {
 	s := fmt.Sprintf(dfFormat, p.b, p.m, p.rl, p.x, p.y, p.z)
-	return os.WriteFile(fmt.Sprintf("%s/worldgen/density_function/%s.json", ns, name), []byte(s), 0)
+	return os.WriteFile(fmt.Sprintf("%s/worldgen/density_function/%s.json", ns, name), []byte(s), 0644)
 }
 
 func writeNoiseFile(ns string, name string) error {
-	return os.WriteFile(fmt.Sprintf("%s/worldgen/noise/%s.json", ns, name), []byte(noiseFile), 0)
+	return os.WriteFile(fmt.Sprintf("%s/worldgen/noise/%s.json", ns, name), []byte(noiseFile), 0644)
 }
 
 func split(rl string) (namespace string, id string) {
