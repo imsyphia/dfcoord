@@ -90,10 +90,14 @@ func genFromDimSeed[T any](dimSeed int64, rd func(a T, first bool, d dfParams) (
 		var cont bool
 		accum, cont = rd(accum, first, p)
 		first = false
+		// concurrently draining the input ensures correctness but allows program to terminate earlier
 		if !cont {
 			close(nStop)
-			for range params {
-			}
+			go func() {
+				for range params {
+				}
+			}()
+			break
 		}
 	}
 
