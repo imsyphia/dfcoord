@@ -1,10 +1,11 @@
 package main
 
 import (
-	"dfcoord/internal/channels"
 	"math"
 	"runtime"
 	"strconv"
+
+	"github.com/imsyphia/dfcoord/internal/channels"
 )
 
 // Keeping generated data in one namespace improves compatibility.
