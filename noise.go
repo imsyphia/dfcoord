@@ -18,19 +18,6 @@ const (
 	vf          = 5.0 / 6.0
 )
 
-type coordNoise struct {
-	n1 perlin
-	n2 perlin
-	vf float64
-}
-
-func newCoordNoise(r xoroshiro) coordNoise {
-	n1 := newPerlin(r.forkFixed().fromHash(octaveStr))
-	n2 := newPerlin(r.forkFixed().fromHash(octaveStr))
-
-	return coordNoise{n1, n2, vf}
-}
-
 type normalNoise struct {
 	n1          perlin
 	n2          perlin
@@ -58,13 +45,13 @@ func (n normalNoise) cuboidBounds(c coord) (cbr coordBounds) {
 	cb1 := n.boundsNoise1(c)
 	cb2 := n.boundsNoise2(c)
 
-	for i := range cb1.lo {
-		cbr.lo[i] = math.Max(cb1.lo[i], cb2.lo[i])
-	}
+	cbr.lo.x = math.Max(cb1.lo.x, cb2.lo.x)
+	cbr.lo.y = math.Max(cb1.lo.y, cb2.lo.y)
+	cbr.lo.z = math.Max(cb1.lo.z, cb2.lo.z)
 
-	for i := range cb1.hi {
-		cbr.hi[i] = math.Min(cb1.hi[i], cb2.hi[i])
-	}
+	cbr.hi.x = math.Min(cb1.hi.x, cb2.hi.x)
+	cbr.hi.y = math.Min(cb1.hi.y, cb2.hi.y)
+	cbr.hi.z = math.Min(cb1.hi.z, cb2.hi.z)
 
 	return cbr
 }
@@ -77,58 +64,69 @@ func (n normalNoise) getValue(c coord) float64 {
 
 func (n normalNoise) getVectors(c coord) ([8]byte, [8]byte) {
 	var c1, c2 coord
-	for i := range c {
-		c1[i] = wrap(c[i])
-		c2[i] = wrap(c[i] * secondScale)
-	}
-	v1 := n.n1.vectors(c1)
-	v2 := n.n2.vectors(c2)
-	return v1, v2
+
+	c1 = wrapCoord(c)
+	c2 = wrapCoord(scaleCoord(c))
+
+	return n.n1.vectors(c1), n.n2.vectors(c2)
 }
 
 func (n normalNoise) getNoiseCoords(c coord) (coord, coord) {
 	var c1, c2 coord
-	for i := range c {
-		c1[i] = wrap(c[i] + n.n1.o[i])
-		c2[i] = wrap(c[i] + n.n1.o[i]*secondScale)
-	}
+
+	c1.x = wrap(c.x + n.n1.o.x)
+	c1.y = wrap(c.y + n.n1.o.y)
+	c1.z = wrap(c.z + n.n1.o.z)
+
+	c2.x = wrap(c.x + n.n1.o.x*secondScale)
+	c2.y = wrap(c.y + n.n1.o.y*secondScale)
+	c2.z = wrap(c.z + n.n1.o.z*secondScale)
+
 	return c1, c2
 }
 
 func wrapCoord(c coord) coord {
 	var r coord
-	for i, v := range c {
-		r[i] = wrap(v)
-	}
+
+	r.x = wrap(c.x)
+	r.y = wrap(c.y)
+	r.z = wrap(c.z)
+
 	return r
 }
 
 func scaleCoord(c coord) coord {
 	var r coord
-	for i, v := range c {
-		r[i] = v * secondScale
-	}
+
+	r.x = c.x * secondScale
+	r.y = c.y * secondScale
+	r.z = c.z * secondScale
+
 	return r
 }
 
 func descaleCoord(c coord) coord {
 	var r coord
-	for i, v := range c {
-		r[i] = v / secondScale
-	}
+
+	r.x = c.x / secondScale
+	r.y = c.y / secondScale
+	r.z = c.z / secondScale
+
 	return r
 }
 
 type perlin struct {
-	p  [256]byte // precomputed random array used for calculating vectors of a point
-	pv [256]byte
+	p  []byte // precomputed random array used for calculating vectors of a point
+	pv []byte
 	o  coord // offset
 }
 
 func newPerlin(r xoroshiro) (n perlin) {
-	for i := range n.o {
-		n.o[i] = r.float64() * 256.0
-	}
+	n.p, n.pv = make([]byte, 256), make([]byte, 256)
+
+	n.o.x = r.float64() * 256.0
+	n.o.y = r.float64() * 256.0
+	n.o.z = r.float64() * 256.0
 
 	for i := range n.p {
 		n.p[i] = byte(i)
@@ -161,26 +159,26 @@ func (n perlin) noise(c coord) float64 {
 	// assumes zero lfif, lfvf, y
 
 	var oc coord
-	for i := range c {
-		oc[i] = c[i] + n.o[i]
-	}
+	oc.x = c.x + n.o.x
+	oc.y = c.y + n.o.y
+	oc.z = c.z + n.o.z
 
 	var ob intCoord
-	for i, v := range oc {
-		ob[i] = int64(math.Floor(v))
-	}
+	ob.x = int64(math.Floor(oc.x))
+	ob.y = int64(math.Floor(oc.y))
+	ob.z = int64(math.Floor(oc.z))
 
 	var of coord
-	for i := range oc {
-		of[i] = oc[i] - float64(ob[i])
-	}
+	of.x = oc.x - float64(ob.x)
+	of.y = oc.y - float64(ob.y)
+	of.z = oc.z - float64(ob.z)
 
 	// some random numbers
 	r := func(i int) int {
 		return int(n.p[i&0xFF] & 0xFF)
 	}
 
-	xb, yb, zb := int(ob[0]), int(ob[1]), int(ob[2])
+	xb, yb, zb := int(ob.x), int(ob.y), int(ob.z)
 
 	rx := r(xb)
 	rx1 := r(xb + 1)
@@ -189,7 +187,7 @@ func (n perlin) noise(c coord) float64 {
 	rxy1 := r(rx + yb + 1)
 	rx1y1 := r(rx1 + yb + 1)
 
-	xf, yf, zf := of[0], of[1], of[2]
+	xf, yf, zf := of.x, of.y, of.z
 
 	// dot products
 	ov000 := gradDot(r(rxy+zb), xf, yf, zf)
@@ -211,17 +209,18 @@ func (n perlin) noise(c coord) float64 {
 
 func (n perlin) cuboidBounds(c coord) (b coordBounds) {
 	var of coord
-	for i, v := range n.o {
-		of[i] = v - math.Floor(v)
-	}
 
-	for i := range c {
-		b.lo[i] = math.Floor(c[i]+of[i]) - of[i]
-	}
+	of.x = n.o.x - math.Floor(n.o.x)
+	of.y = n.o.y - math.Floor(n.o.y)
+	of.z = n.o.z - math.Floor(n.o.z)
 
-	for i, v := range b.lo {
-		b.hi[i] = v + 1
-	}
+	b.lo.x = math.Floor(c.x+of.x) - of.x
+	b.lo.y = math.Floor(c.y+of.y) - of.y
+	b.lo.z = math.Floor(c.z+of.z) - of.z
+
+	b.hi.x = b.lo.x + 1
+	b.hi.y = b.lo.y + 1
+	b.hi.z = b.lo.z + 1
 
 	return b
 }
@@ -233,16 +232,20 @@ func r(p [256]byte, i int) int {
 func (n perlin) vectors(c coord) [8]byte {
 	var oc coord
 	var ob intCoord
-	for i := range c {
-		oc[i] = c[i] + n.o[i]
-		ob[i] = int64(math.Floor(oc[i]))
-	}
+
+	oc.x = c.x + n.o.x
+	oc.y = c.y + n.o.y
+	oc.z = c.z + n.o.z
+
+	ob.x = int64(math.Floor(oc.x))
+	ob.y = int64(math.Floor(oc.y))
+	ob.z = int64(math.Floor(oc.z))
 
 	r := func(i int) int {
 		return int(n.p[i&0xFF] & 0xFF)
 	}
 
-	x, y, z := int(ob[0]), int(ob[1]), int(ob[2])
+	x, y, z := int(ob.x), int(ob.y), int(ob.z)
 
 	rx := r(x)
 	rx1 := r(x + 1)

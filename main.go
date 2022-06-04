@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 )
@@ -17,8 +18,19 @@ type twoParams struct {
 // the file writing is a hack for now
 
 func main() {
-
 	var err error
+	cpufile, err := os.Create("cpu.pprof")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = pprof.StartCPUProfile(cpufile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer cpufile.Close()
+	defer pprof.StopCPUProfile()
 
 	if len(os.Args) < 2 || len(os.Args) > 2 {
 		log.Fatal("Usage: dfcoord <dimension seed>")

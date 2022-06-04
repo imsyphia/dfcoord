@@ -26,10 +26,8 @@ func BenchmarkGetVectorsInlined(b *testing.B) {
 	var c = coord{123, 123, 123}
 	for i := 0; i < b.N; i++ {
 		var c1, c2 coord
-		for i := range c {
-			c1[i] = wrap(c[i])
-			c2[i] = wrap(c[i] * secondScale)
-		}
+		c1 = wrapCoord(c)
+		c2 = wrapCoord(scaleCoord(c))
 		v1 := nn.n1.vectors(c1)
 		v2 := nn.n2.vectors(c2)
 		_, _ = v1, v2

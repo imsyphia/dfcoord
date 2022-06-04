@@ -1,8 +1,12 @@
 package main
 
-type coord [3]float64
+type coord struct {
+	x, y, z float64
+}
 
-type intCoord [3]int64
+type intCoord struct {
+	x, y, z int64
+}
 
 type coordBounds struct {
 	lo coord

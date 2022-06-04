@@ -112,52 +112,50 @@ func genFromNoiseInfo(d noiseInfo) (p []dfParams) {
 	for x := searchMin; x <= searchMax; x++ {
 		for y := searchMin; y <= searchMax; y++ {
 			for z := searchMin; z <= searchMax; z++ {
-				// todo: clean up and optimize
 				c := coord{x, y, z}
-				b1 := nn.boundsNoise1(c)
-				b2 := nn.boundsNoise2(c)
-				l1 := b1.lo[1] > b2.lo[1]
-				l2 := b1.hi[1] > b2.hi[1]
 				v1, v2 := nn.getVectors(c)
-				var vux, vlx, vuz, vlz bool
-				// todo: maybe change to always calculate for both cases and check
-				// the bounds later to make branch prediction more reliable
-				if l1 && l2 {
-					vux, vlx, vuz, vlz = is12AlignedVectorSet(v1, v2)
-				} else if !l1 && !l2 {
-					vux, vlx, vuz, vlz = is12AlignedVectorSet(v2, v1)
-				} else {
-					// case where the bounds of the second fit within the bounds of the first;
-					// it *could* be checked but it's fairly rare and just extra work to implement
-					continue
-				}
-				if vux || vlx || vuz || vlz {
+				vux1, vlx1, vuz1, vlz1 := is12AlignedVectorSet(v1, v2)
+				vux2, vlx2, vuz2, vlz2 := is12AlignedVectorSet(v2, v1)
+				if vux1 || vlx1 || vuz1 || vlz1 || vux2 || vlx2 || vuz2 || vlz2 {
+					b1 := nn.boundsNoise1(c)
+					b2 := nn.boundsNoise2(c)
+					l1 := b1.lo.y > b2.lo.y
+					l2 := b1.hi.y > b2.hi.y
 					var axis axis
-					if vux || vlx {
+					if vux1 || vlx1 || vux2 || vlx2 {
 						axis = axisX
 					} else {
 						axis = axisZ
 					}
-					var yr float64
-					if l1 && l2 {
-						if vux || vuz {
-							yr = b2.hi[1]
+					if l1 && l2 && (vux1 || vlx1 || vuz1 || vlz1) {
+						var yr float64
+						if vux1 || vuz1 {
+							yr = b2.hi.y
 						} else {
-							yr = b1.lo[1]
+							yr = b1.lo.y
 						}
-					} else {
-						if vux || vuz {
-							yr = b1.hi[1]
-						} else {
-							yr = b2.lo[1]
+						params := genFromNoiseLoc(noiseLocInfo{d.dimSeed, d.rl, axis, b1, b2, yr})
+						// it is arguably a bug if the parameters result in NaN or
+						// Inf but the easiest solution is to ignore them for now
+						valid := validateParams(params)
+						if valid {
+							p = append(p, params)
 						}
 					}
-					params := genFromNoiseLoc(noiseLocInfo{d.dimSeed, d.rl, axis, b1, b2, yr})
-					// it is arguably a bug if the parameters result in NaN or
-					// Inf but the easiest solution is to ignore them for now
-					valid := validateParams(params)
-					if valid {
-						p = append(p, params)
+					if !l1 && !l2 && (vux2 || vlx2 || vuz2 || vlz2) {
+						var yr float64
+						if vux2 || vuz2 {
+							yr = b1.hi.y
+						} else {
+							yr = b2.lo.y
+						}
+						params := genFromNoiseLoc(noiseLocInfo{d.dimSeed, d.rl, axis, b1, b2, yr})
+						// it is arguably a bug if the parameters result in NaN or
+						// Inf but the easiest solution is to ignore them for now
+						valid := validateParams(params)
+						if valid {
+							p = append(p, params)
+						}
 					}
 				}
 			}
@@ -281,10 +279,10 @@ func genFromNoiseLoc(res noiseLocInfo) dfParams {
 	}{}
 	var noiseGetter func(float64) float64
 	if res.axis == axisX {
-		zMid := (math.Max(res.b1.lo[2], res.b2.lo[2]) + math.Min(res.b1.hi[2], res.b2.hi[2])) / 2
+		zMid := (math.Max(res.b1.lo.z, res.b2.lo.z+math.Min(res.b1.hi.z, res.b2.hi.z))) / 2
 		pz = zMid
-		xMin := math.Max(res.b1.lo[0], res.b2.lo[0])
-		xMax := math.Min(res.b1.hi[0], res.b2.hi[0])
+		xMin := math.Max(res.b1.lo.x, res.b2.lo.x)
+		xMax := math.Min(res.b1.hi.x, res.b2.hi.x)
 		noiseGetter = func(x float64) float64 {
 			return nn.getValue(coord{x + xMin, res.y, zMid})
 		}
@@ -292,10 +290,10 @@ func genFromNoiseLoc(res noiseLocInfo) dfParams {
 	}
 
 	if res.axis == axisZ {
-		xMid := (math.Max(res.b1.lo[0], res.b2.lo[0]) + math.Min(res.b1.hi[0], res.b2.hi[0])) / 2
+		xMid := (math.Max(res.b1.lo.x, res.b2.lo.x) + math.Min(res.b1.hi.x, res.b2.hi.x)) / 2
 		px = xMid
-		zMin := math.Max(res.b1.lo[2], res.b2.lo[2])
-		zMax := math.Min(res.b1.hi[2], res.b2.hi[2])
+		zMin := math.Max(res.b1.lo.z, res.b2.lo.z)
+		zMax := math.Min(res.b1.hi.z, res.b2.hi.z)
 		noiseGetter = func(x float64) float64 {
 			return nn.getValue(coord{xMid, res.y, x + zMin})
 		}
@@ -366,11 +364,11 @@ func genFromNoiseLoc(res noiseLocInfo) dfParams {
 	offset := (1 / dNoiseGetter(pt)) * (-noiseGetter(pt))
 
 	if res.axis == axisX {
-		px = math.Max(res.b1.lo[0], res.b2.lo[0]) + pt
+		px = math.Max(res.b1.lo.x, res.b2.lo.x) + pt
 	}
 
 	if res.axis == axisZ {
-		pz = math.Max(res.b1.lo[2], res.b2.lo[2]) + pt
+		pz = math.Max(res.b1.lo.z, res.b2.lo.z) + pt
 	}
 
 	return dfParams{res.dimSeed, res.rl, res.axis, px, py, pz, slope, offset}
