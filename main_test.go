@@ -58,3 +58,25 @@ func BenchmarkBounds(b *testing.B) {
 		_ = nn.boundsNoise1(c)
 	}
 }
+
+func BenchmarkFromDimSeed(b *testing.B) {
+	dimSeed := 0
+
+	reduce := func(a twoParams, first bool, d dfParams) (twoParams, bool) {
+		if d.axis == axisX {
+			if !a.okx {
+				a.x = d
+				a.okx = true
+			}
+		} else {
+			if !a.okz {
+				a.z = d
+				a.okz = true
+			}
+		}
+		cont := !(a.okx && a.okz)
+		return a, cont
+	}
+
+	_ = genFromDimSeed(int64(dimSeed), reduce)
+}
