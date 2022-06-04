@@ -71,6 +71,10 @@ func (n normalNoise) getVectors(c coord) ([8]byte, [8]byte) {
 	return n.n1.vectors(c1), n.n2.vectors(c2)
 }
 
+func (n normalNoise) getVectorsIntNoWrap(c coord) uint64 {
+	return (uint64(n.n1.vectorsInt(c)) << 32) | uint64(n.n2.vectorsInt(scaleCoord(c)))
+}
+
 func (n normalNoise) getNoiseCoords(c coord) (coord, coord) {
 	var c1, c2 coord
 
@@ -265,6 +269,47 @@ func (n perlin) vectors(c coord) [8]byte {
 
 	// returns bytes representing vectors for performance
 	return [8]byte{ov000, ov100, ov010, ov110, ov001, ov101, ov011, ov111}
+}
+
+func (n perlin) vectorsInt(c coord) uint32 {
+	var oc coord
+	var ob intCoord
+
+	oc.x = c.x + n.o.x
+	oc.y = c.y + n.o.y
+	oc.z = c.z + n.o.z
+
+	ob.x = int64(math.Floor(c.x + n.o.x))
+	ob.y = int64(math.Floor(c.y + n.o.y))
+	ob.z = int64(math.Floor(c.z + n.o.z))
+
+	x, y, z := byte(ob.x&0xFF), byte(ob.y&0xFF), byte(ob.z&0xFF)
+
+	rx := n.p[x]
+	rx1 := n.p[x+1]
+	rxy := n.p[rx+y]
+	rx1y := n.p[rx1+y]
+	rxy1 := n.p[rx+y+1]
+	rx1y1 := n.p[rx1+y+1]
+
+	ov000 := n.pv[(rxy + z)]
+	ov100 := n.pv[(rx1y + z)]
+	ov010 := n.pv[(rxy1 + z)]
+	ov110 := n.pv[(rx1y1 + z)]
+	ov001 := n.pv[(rxy + z + 1)]
+	ov101 := n.pv[(rx1y + z + 1)]
+	ov011 := n.pv[(rxy1 + z + 1)]
+	ov111 := n.pv[(rx1y1 + z + 1)]
+
+	// returns 4 bit values encoded into uint32 for performance
+	return (uint32(ov000) << 28) |
+		(uint32(ov100) << 24) |
+		(uint32(ov010) << 20) |
+		(uint32(ov110) << 16) |
+		(uint32(ov001) << 12) |
+		(uint32(ov101) << 8) |
+		(uint32(ov011) << 4) |
+		uint32(ov111)
 }
 
 var gradients = [16][3]int{

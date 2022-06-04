@@ -20,6 +20,14 @@ func BenchmarkGetVectors(b *testing.B) {
 	}
 }
 
+func BenchmarkPerlinVectorsInt(b *testing.B) {
+	x := newXoroshiro(0, 0)
+	p := newNormalNoise(x).n1
+	for i := 0; i < b.N; i++ {
+		p.vectorsInt(coord{123, 123, 123})
+	}
+}
+
 func BenchmarkGetVectorsInlined(b *testing.B) {
 	x := newXoroshiro(0, 0)
 	nn := newNormalNoise(x)

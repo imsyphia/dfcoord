@@ -113,9 +113,9 @@ func genFromNoiseInfo(d noiseInfo) (p []dfParams) {
 		for y := searchMin; y <= searchMax; y++ {
 			for z := searchMin; z <= searchMax; z++ {
 				c := coord{x, y, z}
-				v1, v2 := nn.getVectors(c)
-				vux1, vlx1, vuz1, vlz1 := is12AlignedVectorSet(v1, v2)
-				vux2, vlx2, vuz2, vlz2 := is12AlignedVectorSet(v2, v1)
+				v := nn.getVectorsIntNoWrap(c)
+				vux1, vlx1, vuz1, vlz1 := is12AlignedVectorSetInt(v)
+				vux2, vlx2, vuz2, vlz2 := is12AlignedVectorSetInt(v)
 				if vux1 || vlx1 || vuz1 || vlz1 || vux2 || vlx2 || vuz2 || vlz2 {
 					b1 := nn.boundsNoise1(c)
 					b2 := nn.boundsNoise2(c)
@@ -197,44 +197,35 @@ func isAlignedVectorSet(s1 [8]byte, s2 [8]byte) (x bool, z bool) {
 	return xs == 0, zs == 0
 }
 
-func is12AlignedVectorSet(s1 [8]byte, s2 [8]byte) (ux bool, lx bool, uz bool, lz bool) {
+func is12AlignedVectorSetInt(s uint64) (ux bool, lx bool, uz bool, lz bool) {
 
 	// this is a 12 vector check for the case where y of s1 > y of s2
-	// note to self: do not forget the case where s2 is contained within s1
-
-	si := uint64(s1[0])<<60 | uint64(s1[1])<<56 | uint64(s1[2])<<52 | uint64(s1[3])<<48 |
-		uint64(s1[4])<<44 | uint64(s1[5])<<40 | uint64(s1[6])<<36 | uint64(s1[7])<<32 |
-		uint64(s2[0])<<28 | uint64(s2[1])<<24 | uint64(s2[2])<<20 | uint64(s2[3])<<16 |
-		uint64(s2[4])<<12 | uint64(s2[5])<<8 | uint64(s2[6])<<4 | uint64(s2[7])
 
 	// vector order is xyz 000, 100, 010, 110, 001, 101, 011, 111
 
 	// a valid vector set is one where all vectors are on the t-y plane, where t can be x or z
 	// the vectors in a pair along r axis must be exactly equivalent, where r is the axis that t is not (so x if z, etc)
 
-	// i guess i'll check for the first + upper plane of second, then second + lower plane of first? idk
-	// performance doesn't matter *that* much because current time is ~10ns and obtaining vectors takes ~80ns
-
 	// z direction check, all 0s if all checks pass
-	isz := si&0xCCCCCCCCCCCCCCCC ^ 0x8888888888888888
+	isz := s&0xCCCCCCCCCCCCCCCC ^ 0x8888888888888888
 
 	iszUpper := isz & 0xFFFFFFFF00FF00FF // ignore the lower vectors of the second set
 	iszLower := isz & 0xFF00FF00FFFFFFFF // ignore the upper vectors of the first set
 
 	// x direction check, all 0s if all checks pass
-	isx := si & 0xCCCCCCCCCCCCCCCC
+	isx := s & 0xCCCCCCCCCCCCCCCC
 
 	isxUpper := isx & 0xFFFFFFFF00FF00FF // ignore the lower vectors of the second set
 	isxLower := isx & 0xFF00FF00FFFFFFFF // ignore the upper vectors of the first set
 
 	// z pair checks, all 0s if all checks pass
-	pz := (si>>16 ^ si) // check that vectors match and do not mask away garbage
+	pz := (s>>16 ^ s) // check that vectors match and do not mask away garbage
 
 	pzUpper := pz & 0x0000FFFF000000FF // mask away garbage and lower vectors of second set
 	pzLower := pz & 0x0000FF000000FFFF // mask away garbage and upper vectors of first set
 
 	// x pair checks, all 0s if all checks pass
-	px := (si>>4 ^ si) & 0x0F0F0F0F0F0F0F0F // XOR the bits that should match and mask the garbage
+	px := (s>>4 ^ s) & 0x0F0F0F0F0F0F0F0F // XOR the bits that should match and mask the garbage
 
 	pxUpper := px & 0x0F0F0F0F000F000F // mask away garbage and lower vectors of second set
 	pxLower := px & 0x0F000F000F0F0F0F // mask away garbage and upper vectors of first set
